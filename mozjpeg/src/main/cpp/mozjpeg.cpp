@@ -21,7 +21,13 @@ jint throwPixelsException(JNIEnv *env) {
 
 jint throwInvalidPixelsFormat(JNIEnv *env) {
     jclass exClass;
-    exClass = env->FindClass("java/lang/UnknownError");
+    exClass = env->FindClass("com/github/awxkee/mozjpeg/UnsupportedImageFormatException");
+    return env->ThrowNew(exClass, "");
+}
+
+jint throwHardwareBitmapException(JNIEnv *env) {
+    jclass exClass;
+    exClass = env->FindClass("com/github/awxkee/mozjpeg/HardwareBitmapIsNotImplementedException");
     return env->ThrowNew(exClass, "");
 }
 
@@ -34,6 +40,11 @@ Java_com_github_awxkee_mozjpeg_Mozjpeg_compressImpl(JNIEnv *env, jobject thiz, j
     AndroidBitmapInfo info;
     if (AndroidBitmap_getInfo(env, bitmap, &info) < 0) {
         throwPixelsException(env);
+        return static_cast<jbyteArray>(nullptr);
+    }
+
+    if (info.flags & ANDROID_BITMAP_FLAGS_IS_HARDWARE) {
+        throwHardwareBitmapException(env);
         return static_cast<jbyteArray>(nullptr);
     }
 
@@ -57,7 +68,7 @@ Java_com_github_awxkee_mozjpeg_Mozjpeg_compressImpl(JNIEnv *env, jobject thiz, j
     if (info.format == ANDROID_BITMAP_FORMAT_RGBA_8888) {
         memcpy(dstARGB.get(), addr, info.stride * info.height);
     } else if (info.format == ANDROID_BITMAP_FORMAT_RGBA_1010102) {
-        libyuv::AR30ToABGR(static_cast<const uint8_t *>(addr), (int)info.stride,
+        libyuv::AR30ToABGR(static_cast<const uint8_t *>(addr), (int) info.stride,
                            reinterpret_cast<uint8_t *>(dstARGB.get()),
                            (int) info.width * 4, (int) info.width,
                            (int) info.height);
@@ -91,7 +102,8 @@ Java_com_github_awxkee_mozjpeg_Mozjpeg_compressImpl(JNIEnv *env, jobject thiz, j
     unsigned char *jpegBuf = nullptr;
     unsigned long jpegSize;
     int pixelFormat = TJPF_RGBA;
-    if (info.format == ANDROID_BITMAP_FORMAT_RGB_565 || info.format == ANDROID_BITMAP_FORMAT_RGBA_1010102) {
+    if (info.format == ANDROID_BITMAP_FORMAT_RGB_565 ||
+        info.format == ANDROID_BITMAP_FORMAT_RGBA_1010102) {
         pixelFormat = TJPF_BGRA;
     }
     auto ret = tjCompress2(tjInstance.get(), reinterpret_cast<const unsigned char *>(dstARGB.get()),
