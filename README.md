@@ -1,0 +1,1 @@
+# Convenient mozjpeg encoder binding for android api v24+
